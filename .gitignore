@@ -1,0 +1,6 @@
+mlruns
+db_data
+minio_data
+output
+.env
+
