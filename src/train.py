@@ -127,51 +127,53 @@ def objective(trial):
 def apply_best_model(study, args):
     """apply best model from hyperparameter tuning to training an dvalidation data"""
 
-    final_model = args.clf
+    with mlflow.start_run(run_name="best-model") as run:
 
-    if final_model == "rf":
-        best_model = RandomForestClassifier(
-            n_estimators=study.best_params["n_estimators"],
-            max_depth=study.best_params["max_depth"],
-            min_samples_leaf=study.best_params["min_samples_leaf"],
-            min_samples_split=study.best_params["min_samples_split"],
-            n_jobs=-1,
-        )
+        final_model = args.clf
+    
+        if final_model == "rf":
+            best_model = RandomForestClassifier(
+                n_estimators=study.best_params["n_estimators"],
+                max_depth=study.best_params["max_depth"],
+                min_samples_leaf=study.best_params["min_samples_leaf"],
+                min_samples_split=study.best_params["min_samples_split"],
+                n_jobs=-1,
+            )
 
-    if final_model == "xgb":
-        parameters = {
-            "objective": "reg:squarederror",
-            "n_estimators": study.best_params["n_estimators"],
-            "eta": study.best_params["eta"],
-            "gamma": study.best_params["gamma"],
-            "alpha": study.best_params["alpha"],
-            "max_depth": study.best_params["max_depth"],
-            "min_child_weight": study.best_params["min_child_weight"],
-            "colsample_bytree": study.best_params["colsample_bytree"],
-            "subsample": study.best_params["subsample"],
-            "verbosity": 1,
-        }
+        if final_model == "xgb":
+            parameters = {
+                "objective": "reg:squarederror",
+                "n_estimators": study.best_params["n_estimators"],
+                "eta": study.best_params["eta"],
+                "gamma": study.best_params["gamma"],
+                "alpha": study.best_params["alpha"],
+                "max_depth": study.best_params["max_depth"],
+                "min_child_weight": study.best_params["min_child_weight"],
+                "colsample_bytree": study.best_params["colsample_bytree"],
+                "subsample": study.best_params["subsample"],
+                "verbosity": 1,
+            }
 
-        best_model = xgb.XGBClassifier(**parameters)
+            best_model = xgb.XGBClassifier(**parameters)
 
-    best_model.fit(Xt, yt)
-    pred_train = best_model.predict(Xt)
-    pred_valid = best_model.predict(Xv)
+        best_model.fit(Xt, yt)
+        pred_train = best_model.predict(Xt)
+        pred_valid = best_model.predict(Xv)
 
-    # print feature importances if rf is used
-    if final_model == "rf":
-        print("\nfeature importances:")
-        feature_names = args.input_data
-        importances = best_model.feature_importances_
-        print_feature_importances(feature_names, importances)
+        # print feature importances if rf is used
+        if final_model == "rf":
+            print("\nfeature importances:")
+            feature_names = args.input_data
+            importances = best_model.feature_importances_
+            print_feature_importances(feature_names, importances)
 
-    if args.save:
-        model_path = os.path.join(args.out_path, f"{best_model.__class__.__name__}.bin")
-        joblib.dump(best_model, model_path)
-    if args.log_model:
-        mlflow.sklearn.log_model(best_model, "models")
+        if args.save:
+            model_path = os.path.join(args.out_path, f"{best_model.__class__.__name__}.bin")
+            joblib.dump(best_model, model_path)
+        if args.log_model:
+            mlflow.sklearn.log_model(best_model, "models")
 
-    return pred_train, pred_valid
+        return pred_train, pred_valid
 
 
 def main(args):

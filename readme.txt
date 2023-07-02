@@ -2,7 +2,7 @@ Requirements:
 * Docker 
 * docker-compose
 
-sudo docker-compose --env-file default.env up -d --build
+sudo docker-compose --env-file .env up -d --build
 
 sudo docker-compose down
 
