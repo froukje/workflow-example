@@ -9,6 +9,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 from sklearn.utils import resample
+from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 import xgboost as xgb
 
@@ -111,6 +112,13 @@ def objective(trial):
     print(f"Accuracy on validation set {acc_valid:.4f}")
     print(f"Recall on validation set {rec_valid:.4f}")
     print(f"Precision on validation set {prec_valid:.4f}")
+        
+    mlflow.log_metric("acc_train", float(acc_train))
+    mlflow.log_metric("rec_train", float(rec_train))
+    mlflow.log_metric("prec_train", float(prec_train))
+    mlflow.log_metric("acc_valid", float(acc_valid))
+    mlflow.log_metric("rec_valid", float(rec_valid))
+    mlflow.log_metric("prec_valid", float(prec_valid))
 
     valid_score = rec_valid
 
@@ -128,7 +136,7 @@ def apply_best_model(study, args):
     """apply best model from hyperparameter tuning to training an dvalidation data"""
 
     with mlflow.start_run(run_name="best-model") as run:
-
+        mlflow.log_params(vars(args))
         final_model = args.clf
     
         if final_model == "rf":
@@ -171,12 +179,44 @@ def apply_best_model(study, args):
             model_path = os.path.join(args.out_path, f"{best_model.__class__.__name__}.bin")
             joblib.dump(best_model, model_path)
         if args.log_model:
-            mlflow.sklearn.log_model(best_model, "models")
+            if args.scale:
+                pipe = Pipeline([('scaler', scaler), ('model', best_model)])
+            else:
+                pipe = Pipeline([('model', best_model)])
+            mlflow.sklearn.log_model(pipe, "models")
+
+        acc_train = accuracy_score(pred_train, yt)
+        rec_train = recall_score(pred_train, yt)
+        prec_train = precision_score(pred_train, yt)
+        acc_valid = accuracy_score(pred_valid, yv)
+        rec_valid = recall_score(pred_valid, yv)
+        prec_valid = precision_score(pred_valid, yv)
+        print(f"Accuracy on training set {acc_train:.4f}")
+        print(f"Recall on training set {rec_train:.4f}")
+        print(f"Precision on training set {prec_train:.4f}")
+        print(f"Accuracy on validation set {acc_valid:.4f}")
+        print(f"Recall on validation set {rec_valid:.4f}")
+        print(f"Precision on validation set {prec_valid:.4f}")
+
+        mlflow.log_metric("acc_train", float(acc_train))
+        mlflow.log_metric("rec_train", float(rec_train))
+        mlflow.log_metric("prec_train", float(prec_train))
+        mlflow.log_metric("acc_valid", float(acc_valid))
+        mlflow.log_metric("rec_valid", float(rec_valid))
+        mlflow.log_metric("prec_valid", float(prec_valid))
 
         return pred_train, pred_valid
 
 
 def main(args):
+    
+    global best_model
+    best_model = None
+    global scaler
+    scaler = None
+    global max_score
+    max_score = -np.inf
+
     start_time = time.time()
     print("read and prepare data ..")
     df = pd.read_csv(args.path)
@@ -213,11 +253,7 @@ def main(args):
 
     print(f"reading and preparing data took: {time.time() - start_time:.4f} s")
     current = time.time()
-
-    global best_model
-    best_model = None
-    global max_score
-    max_score = -np.inf
+    
     global Xt
     Xt = X_train
     global yt
@@ -233,26 +269,6 @@ def main(args):
     print("make predictions and calculate metrics for best model...")
     pred_train, pred_valid = apply_best_model(study, args)
 
-    acc_train = accuracy_score(pred_train, y_train)
-    rec_train = recall_score(pred_train, y_train)
-    prec_train = precision_score(pred_train, y_train)
-    acc_valid = accuracy_score(pred_valid, y_valid)
-    rec_valid = recall_score(pred_valid, y_valid)
-    prec_valid = precision_score(pred_valid, y_valid)
-    print(f"Accuracy on training set {acc_train:.4f}")
-    print(f"Recall on training set {rec_train:.4f}")
-    print(f"Precision on training set {prec_train:.4f}")
-    print(f"Accuracy on validation set {acc_valid:.4f}")
-    print(f"Recall on validation set {rec_valid:.4f}")
-    print(f"Precision on validation set {prec_valid:.4f}")
-
-    mlflow.log_metric("acc_train", float(acc_train))
-    mlflow.log_metric("rec_train", float(rec_train))
-    mlflow.log_metric("prec_train", float(prec_train))
-    mlflow.log_metric("acc_valid", float(acc_valid))
-    mlflow.log_metric("rec_valid", float(rec_valid))
-    mlflow.log_metric("prec_valid", float(prec_valid))
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -264,7 +280,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--out-path",
         type=str,
-        default="output",  # "s3://model-development/example/",
+        default="s3://model-development/example/",
     )
     parser.add_argument(
         "--input-data",

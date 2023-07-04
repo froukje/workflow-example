@@ -49,7 +49,6 @@ services:
 
 volumes:
   db_data:
-  minio_data:
 
 networks:
   frontend:

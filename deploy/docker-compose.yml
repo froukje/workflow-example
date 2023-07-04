@@ -1,0 +1,10 @@
+version: "3.7"
+
+services:
+   model:
+     build: .
+     environment:
+       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+     command: python3 apply-model.py
